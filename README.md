@@ -155,7 +155,7 @@ The installer copies `SKILL.md` to `~/.claude/skills/orchestrator/`, backs up an
 
 ---
 
-## 🎛️ Usage
+## 🪄 Usage
 
 In Claude Code:
 
@@ -185,7 +185,7 @@ You can steer it in plain language mid-session, in any language: *"T2 use gemini
 
 ---
 
-## 🛡️ Safety
+## 🔒 Safety
 
 **Two permission profiles.** Claude picks one per task:
 

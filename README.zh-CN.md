@@ -155,7 +155,7 @@ curl -fsSL https://raw.githubusercontent.com/yoelkh/orkestraku/main/install.sh |
 
 ---
 
-## 🎛️ 使用
+## 🪄 使用
 
 在 Claude Code 中：
 
@@ -185,7 +185,7 @@ curl -fsSL https://raw.githubusercontent.com/yoelkh/orkestraku/main/install.sh |
 
 ---
 
-## 🛡️ 安全
+## 🔒 安全
 
 **两种权限配置。** Claude 为每个任务选择其一：
 

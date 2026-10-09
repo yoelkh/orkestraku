@@ -155,7 +155,7 @@ El instalador copia `SKILL.md` a `~/.claude/skills/orchestrator/`, guarda una co
 
 ---
 
-## 🎛️ Uso
+## 🪄 Uso
 
 En Claude Code:
 
@@ -185,7 +185,7 @@ Puedes ajustarlo a mitad de sesión con lenguaje natural, en cualquier idioma: *
 
 ---
 
-## 🛡️ Seguridad
+## 🔒 Seguridad
 
 **Dos perfiles de permisos.** Claude elige uno por tarea:
 
