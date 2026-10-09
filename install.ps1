@@ -3,11 +3,11 @@
   Installs (or removes) the OrkestraKu /orchestrator skill for Claude Code.
 
 .DESCRIPTION
-  Downloads skills/orchestrator/SKILL.md from GitHub into
+  Downloads the skill (SKILL.md, references/, scripts/) from GitHub into
   ~/.claude/skills/orchestrator/ (user scope, default) or
-  .claude/skills/orchestrator/ in the current folder (project scope),
-  backs up any different existing copy, then checks which worker CLIs
-  (grok, agy, opencode) are available.
+  .claude/skills/orchestrator/ in the current folder (project scope).
+  Changed files are backed up to ~/.claude/orchestra/backups/<timestamp>/.
+  Then it scans the machine for AI agent CLIs (read-only: version commands only).
 
   One-liner (PowerShell):
     irm https://raw.githubusercontent.com/yoelkh/orkestraku/main/install.ps1 | iex
@@ -23,10 +23,14 @@
   Git branch, tag, or commit to install from. Default: main.
 
 .PARAMETER Source
-  Install from a local SKILL.md instead of downloading (for development).
+  Install from a local skill folder (the one containing SKILL.md) instead of
+  downloading. For development.
 
 .PARAMETER Uninstall
-  Remove the installed skill (backups are kept).
+  Remove the installed skill files (backups and the worker cache are kept).
+
+.PARAMETER NoScan
+  Skip the CLI scan at the end.
 #>
 [CmdletBinding()]
 param(
@@ -34,16 +38,17 @@ param(
   [string]$Scope = 'user',
   [string]$Ref = 'main',
   [string]$Source,
-  [switch]$Uninstall
+  [switch]$Uninstall,
+  [switch]$NoScan
 )
 
 $ErrorActionPreference = 'Stop'
 $Repo = 'yoelkh/orkestraku'
 $SkillName = 'orchestrator'
+$Files = @('SKILL.md', 'references/workers.md', 'scripts/discover.ps1', 'scripts/discover.sh')
 
 function Write-Step($msg) { Write-Host "  $msg" }
 function Write-Ok($msg)   { Write-Host "  [OK] " -ForegroundColor Green -NoNewline; Write-Host $msg }
-function Write-Warn2($msg){ Write-Host "  [!!] " -ForegroundColor Yellow -NoNewline; Write-Host $msg }
 function Write-No($msg)   { Write-Host "  [--] " -ForegroundColor DarkGray -NoNewline; Write-Host $msg }
 
 if ($Scope -eq 'project') {
@@ -52,7 +57,6 @@ if ($Scope -eq 'project') {
   $Base = Join-Path $HOME '.claude\skills'
 }
 $Target = Join-Path $Base $SkillName
-$SkillFile = Join-Path $Target 'SKILL.md'
 
 Write-Host ''
 Write-Host '  OrkestraKu' -ForegroundColor Cyan -NoNewline
@@ -60,90 +64,102 @@ Write-Host '  /orchestrator skill for Claude Code'
 Write-Host ''
 
 if ($Uninstall) {
-  if (Test-Path $SkillFile) {
-    Remove-Item -LiteralPath $SkillFile -Force
-    Write-Ok "Removed $SkillFile"
-    $left = @(Get-ChildItem -LiteralPath $Target -Force -ErrorAction SilentlyContinue)
-    if ($left.Count -eq 0) { Remove-Item -LiteralPath $Target -Force; Write-Ok "Removed empty $Target" }
-    else { Write-Step "Kept $($left.Count) backup file(s) in $Target" }
-  } else {
-    Write-No "Nothing to remove at $SkillFile"
+  $removed = 0
+  foreach ($f in $Files) {
+    $p = Join-Path $Target ($f -replace '/', '\')
+    if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force; $removed++ }
   }
+  foreach ($d in @('references', 'scripts', '')) {
+    $p = if ($d) { Join-Path $Target $d } else { $Target }
+    if ((Test-Path -LiteralPath $p) -and @(Get-ChildItem -LiteralPath $p -Force).Count -eq 0) {
+      Remove-Item -LiteralPath $p -Force
+    }
+  }
+  if ($removed -gt 0) { Write-Ok "Removed $removed file(s) from $Target" } else { Write-No "Nothing to remove at $Target" }
+  if (Test-Path -LiteralPath $Target) { Write-Step "Kept other files in $Target" }
   Write-Host ''
   return
 }
 
-# --- get the skill ----------------------------------------------------------
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ("orkestraku-" + [guid]::NewGuid().ToString('N') + '.md')
+# --- get every file into a staging folder first (nothing changes on failure) --
+$stage = Join-Path ([IO.Path]::GetTempPath()) ("orkestraku-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
-  if ($Source) {
-    Copy-Item -LiteralPath $Source -Destination $tmp
-    Write-Ok "Using local source $Source"
-  } else {
+  if (-not $Source) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    $url = "https://raw.githubusercontent.com/$Repo/$Ref/skills/$SkillName/SKILL.md"
-    Write-Step "Downloading $url"
-    Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
-  }
-
-  $content = [IO.File]::ReadAllText($tmp)
-  if (-not ($content.StartsWith('---') -and $content -match "(?m)^name:\s*$SkillName\s*$")) {
-    throw "Downloaded file does not look like the $SkillName skill. Aborting; nothing was changed."
-  }
-
-  New-Item -ItemType Directory -Force -Path $Target | Out-Null
-  if (Test-Path $SkillFile) {
-    $old = [IO.File]::ReadAllText($SkillFile)
-    if ($old -eq $content) {
-      Write-Ok "Already up to date: $SkillFile"
-    } else {
-      $bak = "$SkillFile.bak-" + (Get-Date -Format 'yyyyMMdd-HHmmss')
-      Copy-Item -LiteralPath $SkillFile -Destination $bak
-      Write-Ok "Backed up previous version to $bak"
-      Copy-Item -LiteralPath $tmp -Destination $SkillFile -Force
-      Write-Ok "Updated $SkillFile"
-    }
+    Write-Step "Downloading from github.com/$Repo ($Ref)"
   } else {
-    Copy-Item -LiteralPath $tmp -Destination $SkillFile -Force
-    Write-Ok "Installed $SkillFile"
+    Write-Ok "Using local source $Source"
   }
+  foreach ($f in $Files) {
+    $dst = Join-Path $stage ($f -replace '/', '\')
+    New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
+    if ($Source) {
+      Copy-Item -LiteralPath (Join-Path $Source ($f -replace '/', '\')) -Destination $dst
+    } else {
+      Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$Repo/$Ref/skills/$SkillName/$f" -OutFile $dst -UseBasicParsing
+    }
+    if ((Get-Item -LiteralPath $dst).Length -eq 0) { throw "$f is empty. Aborting; nothing was changed." }
+  }
+
+  $skill = [IO.File]::ReadAllText((Join-Path $stage 'SKILL.md'))
+  if (-not ($skill.StartsWith('---') -and $skill -match "(?m)^name:\s*$SkillName\s*$")) {
+    throw "SKILL.md does not look like the $SkillName skill. Aborting; nothing was changed."
+  }
+
+  # --- install, backing up files that differ ---------------------------------
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+  $backup = Join-Path $HOME ".claude\orchestra\backups\$stamp"
+  $installed = 0; $updated = 0; $same = 0
+  foreach ($f in $Files) {
+    $rel = $f -replace '/', '\'
+    $src = Join-Path $stage $rel
+    $dst = Join-Path $Target $rel
+    New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
+    if (Test-Path -LiteralPath $dst) {
+      if ((Get-FileHash -LiteralPath $dst).Hash -eq (Get-FileHash -LiteralPath $src).Hash) { $same++; continue }
+      $b = Join-Path $backup $rel
+      New-Item -ItemType Directory -Force -Path (Split-Path $b) | Out-Null
+      Copy-Item -LiteralPath $dst -Destination $b
+      Copy-Item -LiteralPath $src -Destination $dst -Force
+      $updated++
+    } else {
+      Copy-Item -LiteralPath $src -Destination $dst -Force
+      $installed++
+    }
+  }
+  if ($updated -gt 0) { Write-Ok "Backed up $updated changed file(s) to $backup" }
+  if ($installed + $updated -eq 0) { Write-Ok "Already up to date: $Target" }
+  else { Write-Ok "Installed $Target  ($installed new, $updated updated, $same unchanged)" }
 } finally {
-  if (Test-Path $tmp) { Remove-Item -LiteralPath $tmp -Force }
+  if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 }
 
-# --- worker check (read-only) -----------------------------------------------
-Write-Host ''
-Write-Host '  Workers' -ForegroundColor Cyan
-
-function Test-Worker($name, $cmd, $versionArgs, $hint) {
+# --- scan for AI agent CLIs (read-only) ---------------------------------------
+if (-not $NoScan) {
   # Windows PowerShell 5.1 turns native stderr into terminating errors under 'Stop'.
   $ErrorActionPreference = 'Continue'
-  $c = Get-Command $cmd -ErrorAction SilentlyContinue
-  if (-not $c) { Write-No "$name  not installed  ($hint)"; return }
+  Write-Host ''
+  Write-Host '  AI CLIs found on this machine' -ForegroundColor Cyan
+  $scan = Join-Path $Target 'scripts\discover.ps1'
   try {
-    $v = (& $cmd @versionArgs 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or $v -match 'not a valid application|postinstall') {
-      Write-Warn2 "$name  found but failed to run. If it was installed with npm, run its postinstall: cd `"$env:APPDATA\npm\node_modules\opencode-ai`"; node postinstall.mjs"
-    } else {
-      Write-Ok "$name  $(($v -split "`n")[0])"
+    $rows = & powershell -NoProfile -ExecutionPolicy Bypass -File $scan | Out-String | ConvertFrom-Json
+    foreach ($r in @($rows)) {
+      $label = '{0,-12} {1,-9}' -f $r.name, $r.kind
+      if ($r.kind -eq 'brain' -or $r.kind -eq 'gateway') { Write-No "$label $($r.version)  (not used as a worker)" }
+      elseif ($r.runs) { Write-Ok "$label $($r.version)" }
+      else { Write-Host "  [!!] " -ForegroundColor Yellow -NoNewline; Write-Host "$label fails to start: $($r.version)" }
     }
+    Write-Ok ('{0,-12} {1,-9} Claude subagents (always available)' -f 'sub', 'agent')
   } catch {
-    $m = $_.Exception.Message
-    if ($m -match 'not a valid application') {
-      Write-Warn2 "$name  found but failed to run. If it was installed with npm, run its postinstall: cd `"$env:APPDATA\npm\node_modules\opencode-ai`"; node postinstall.mjs"
-    } else {
-      Write-Warn2 "$name  found but failed to run: $m"
-    }
+    Write-No "Scan skipped: $($_.Exception.Message)"
   }
 }
-
-Test-Worker 'grok    ' 'grok'     @('--no-auto-update', '--version') 'https://x.ai  -> then run: grok login'
-Test-Worker 'agy     ' 'agy'      @('--version')                      'Antigravity CLI (Gemini)'
-Test-Worker 'opencode' 'opencode' @('--version')                      'npm i -g opencode-ai'
-Write-Ok   "sub       Claude subagents (always available inside Claude Code)"
 
 Write-Host ''
 Write-Host '  Next: open Claude Code and run ' -NoNewline
-Write-Host '/orchestrator <your task>' -ForegroundColor Cyan
-Write-Host '  Missing workers are skipped automatically; the skill never installs or logs in anything for you.'
+Write-Host '/orchestrator scan' -ForegroundColor Cyan -NoNewline
+Write-Host ' to see which workers are ready, then ' -NoNewline
+Write-Host '/orchestrator <task>' -ForegroundColor Cyan
+Write-Host '  Sign-in and API keys stay your call; the skill never installs or logs in anything for you.'
 Write-Host ''

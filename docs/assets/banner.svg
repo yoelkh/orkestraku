@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="OrkestraKu: one Claude brain conducts grok, Gemini, opencode and Claude subagents">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="OrkestraKu: one Claude brain finds and conducts every AI CLI you have">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0f1115"/>
@@ -41,8 +41,8 @@
       <text x="414" y="312" text-anchor="middle">Best model, picked live</text>
       <rect x="72" y="336" width="200" height="34" rx="17" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.18"/>
       <text x="172" y="358" text-anchor="middle">Read-only by default</text>
-      <rect x="284" y="336" width="183" height="34" rx="17" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.18"/>
-      <text x="375.5" y="358" text-anchor="middle">Supervised or auto</text>
+      <rect x="284" y="336" width="190" height="34" rx="17" fill="#f5b97a" fill-opacity="0.14" stroke="#f5b97a" stroke-opacity="0.55"/>
+      <text x="379" y="358" text-anchor="middle" fill="#f5b97a">Finds every AI CLI</text>
     </g>
   </g>
 
@@ -92,6 +92,7 @@
     <text x="1214" y="308" fill="#ffffff" font-size="18" font-weight="700">subagent</text>
     <text x="1214" y="331" fill="#9aa0ad" font-size="13">critical code</text>
 
-    <text x="1013" y="382" fill="#9aa0ad" font-size="14">brief.md  →  worker  →  STATUS block  →  brain verifies</text>
+    <text x="1013" y="372" fill="#d4d7de" font-size="14">+ qwen · kimi · mimo · hermes · any agent CLI it finds</text>
+    <text x="1013" y="398" fill="#9aa0ad" font-size="14">scan  →  probe  →  brief  →  worker  →  brain verifies</text>
   </g>
 </svg>
