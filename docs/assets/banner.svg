@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="OrkestraKu: one Claude brain conducts grok, Gemini, opencode and Claude subagents">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1115"/>
+      <stop offset="0.55" stop-color="#16141f"/>
+      <stop offset="1" stop-color="#1c140f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d97757"/>
+      <stop offset="1" stop-color="#f5b97a"/>
+    </linearGradient>
+    <radialGradient id="brain" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#f5b97a"/>
+      <stop offset="0.6" stop-color="#d97757"/>
+      <stop offset="1" stop-color="#9a4a32"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#d97757" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#d97757" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <circle cx="1013" cy="130" r="190" fill="url(#glow)"/>
+  <g opacity="0.05" stroke="#ffffff">
+    <path d="M0 70H1280M0 140H1280M0 210H1280M0 280H1280M0 350H1280"/>
+    <path d="M160 0V420M320 0V420M480 0V420M640 0V420M800 0V420M960 0V420M1120 0V420"/>
+  </g>
+
+  <!-- Title -->
+  <g font-family="Segoe UI, Inter, Roboto, Helvetica, Arial, sans-serif">
+    <text x="72" y="150" fill="#ffffff" font-size="64" font-weight="700">Orkestra<tspan fill="#f5b97a">Ku</tspan></text>
+    <rect x="74" y="170" width="120" height="6" rx="3" fill="url(#accent)"/>
+    <text x="72" y="222" fill="#d4d7de" font-size="25">One Claude brain conducts your AI workers.</text>
+    <text x="72" y="256" fill="#d4d7de" font-size="25">Right worker, right model, right effort, <tspan fill="#f5b97a" font-weight="700">per task</tspan>.</text>
+
+    <g font-size="16" fill="#ffffff">
+      <rect x="72" y="290" width="217" height="34" rx="17" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.18"/>
+      <text x="180.5" y="312" text-anchor="middle">Direct CLI · no bridge</text>
+      <rect x="301" y="290" width="226" height="34" rx="17" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.18"/>
+      <text x="414" y="312" text-anchor="middle">Best model, picked live</text>
+      <rect x="72" y="336" width="200" height="34" rx="17" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.18"/>
+      <text x="172" y="358" text-anchor="middle">Read-only by default</text>
+      <rect x="284" y="336" width="183" height="34" rx="17" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.18"/>
+      <text x="375.5" y="358" text-anchor="middle">Supervised or auto</text>
+    </g>
+  </g>
+
+  <!-- Connectors: briefs flow down to the workers -->
+  <g fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 11">
+    <path d="M1013 180 C1013 232 812 228 812 280" stroke="#e5e7eb" stroke-opacity="0.7">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.4s" repeatCount="indefinite"/>
+    </path>
+    <path d="M1013 180 C1013 232 946 228 946 280" stroke="#60a5fa">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.7s" repeatCount="indefinite"/>
+    </path>
+    <path d="M1013 180 C1013 232 1080 228 1080 280" stroke="#34d399">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M1013 180 C1013 232 1214 228 1214 280" stroke="#f0a07a">
+      <animate attributeName="stroke-dashoffset" from="36" to="0" dur="1.8s" repeatCount="indefinite"/>
+    </path>
+  </g>
+
+  <!-- Brain -->
+  <g font-family="Segoe UI, Inter, Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="1013" y="58" fill="#9aa0ad" font-size="14" letter-spacing="1">PLANS · DECIDES · VERIFIES</text>
+    <circle cx="1013" cy="130" r="56" fill="none" stroke="#d97757" stroke-opacity="0.35" stroke-width="2">
+      <animate attributeName="r" values="52;60;52" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="stroke-opacity" values="0.45;0.1;0.45" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1013" cy="130" r="48" fill="url(#brain)"/>
+    <text x="1013" y="128" fill="#ffffff" font-size="17" font-weight="700" letter-spacing="1.5">BRAIN</text>
+    <text x="1013" y="148" fill="#fff4ea" font-size="13">Claude Code</text>
+  </g>
+
+  <!-- Workers -->
+  <g font-family="Segoe UI, Inter, Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <rect x="752" y="280" width="120" height="66" rx="14" fill="#111318" stroke="#e5e7eb" stroke-opacity="0.7" stroke-width="2"/>
+    <text x="812" y="308" fill="#ffffff" font-size="18" font-weight="700">grok</text>
+    <text x="812" y="331" fill="#9aa0ad" font-size="13">web research</text>
+
+    <rect x="886" y="280" width="120" height="66" rx="14" fill="#111318" stroke="#60a5fa" stroke-width="2"/>
+    <text x="946" y="308" fill="#ffffff" font-size="18" font-weight="700">Gemini</text>
+    <text x="946" y="331" fill="#9aa0ad" font-size="13">long context</text>
+
+    <rect x="1020" y="280" width="120" height="66" rx="14" fill="#111318" stroke="#34d399" stroke-width="2"/>
+    <text x="1080" y="308" fill="#ffffff" font-size="18" font-weight="700">opencode</text>
+    <text x="1080" y="331" fill="#9aa0ad" font-size="13">bulk edits</text>
+
+    <rect x="1154" y="280" width="120" height="66" rx="14" fill="#111318" stroke="#f0a07a" stroke-width="2"/>
+    <text x="1214" y="308" fill="#ffffff" font-size="18" font-weight="700">subagent</text>
+    <text x="1214" y="331" fill="#9aa0ad" font-size="13">critical code</text>
+
+    <text x="1013" y="382" fill="#9aa0ad" font-size="14">brief.md  →  worker  →  STATUS block  →  brain verifies</text>
+  </g>
+</svg>
