@@ -42,6 +42,7 @@
 | 🔎 | **找出你拥有的每一个 AI CLI** | 只读扫描器在 PATH 中查找 43 个已知 AI CLI，并在全局 npm 包中寻找未知候选。它只运行版本命令。 |
 | 🧪 | **先试跑，再信任** | 每个 CLI 在临时文件夹中接受一次"三合一"探测：能否读文件、只读模式是否真的阻止写入、引号能否完整传递。 |
 | 🏷️ | **知道 CLI 为何闲置** | 每种失败都会被归类（`needs-login`、`needs-key`、`unsupported`、`broken` 等），并给出启用它的确切步骤。 |
+| 🧭 | **开工前的配置顾问** | 绘制角色覆盖情况（联网、长上下文、免费修改、跨厂商审查），对最能增强能力的登录和设置排序——免费优先于付费，涉及隐私的取舍从不主动推荐——等你完成后重新探测。 |
 | 🗂️ | **跨项目记忆** | 探测结果按 CLI 版本缓存，耗时或收费的探测不会重复。闲置的 CLI 每次会话都会复查，你一登录就能立刻用上。 |
 | 🧠 | **Claude 始终是大脑** | 负责规划、决策、监督和验证。任何结果都不会仅凭执行者的一面之词被接受。 |
 | 🎯 | **用满整个乐团** | 按能力分配（联网搜索、长上下文、免费模型、最强推理），把并行任务分散到不同执行者，还能请跨厂商"评审团"给出第二意见。 |
@@ -56,12 +57,24 @@
 
 ## 🧭 工作原理
 
+每次运行都按顺序经过三个阶段。大脑在确切知道自己有哪些执行者之前，绝不开始工作。
+
 ```mermaid
 flowchart TD
-    U(["你：/orchestrator 任务"]) --> SC["扫描<br/>PATH 与 npm 中的所有 AI CLI"]
-    SC --> PR["探测<br/>读取 · 阻止写入 · 引号"]
-    PR --> CAT["模型目录<br/>每个执行者的最新模型"]
-    CAT --> PL["规划<br/>拆分为子任务"]
+    U(["你：/orchestrator 任务"]) --> P1
+    subgraph P1["阶段 1 · 分析"]
+        SC["扫描<br/>PATH 与 npm 中的所有 AI CLI"] --> PR["探测<br/>读取 · 阻止写入 · 引号"]
+    end
+    P1 --> P2
+    subgraph P2["阶段 2 · 配置顾问"]
+        MAP["能力地图<br/>哪些角色已覆盖？"] --> REC["排序后的建议<br/>登录 · 密钥 · 设置"]
+        REC --> ASK{"你选择<br/>要配置什么"}
+        ASK -- "配置" --> DO["你在自己的终端<br/>中登录"] --> RE["重新探测"] --> ASK
+    end
+    ASK -- "继续" --> P3
+    subgraph P3["阶段 3 · 大脑"]
+        CAT["模型目录<br/>每个执行者的最新模型"] --> PL["规划<br/>拆分为子任务"]
+    end
     PL --> D{"值得<br/>委派吗？"}
     D -- "否：太小或相互依赖" --> SELF["Claude 亲自完成"]
     D -- 是 --> B["编写任务说明<br/>.orchestra/briefs/T1.md"]
@@ -176,7 +189,7 @@ curl -fsSL https://raw.githubusercontent.com/yoelkh/orkestraku/main/install.sh |
   [OK] sub          agent     Claude subagents (always available)
 ```
 
-"找到"不等于"就绪"：在 Claude Code 中运行 `/orchestrator scan` 来探测它们。
+"找到"不等于"就绪"：在 Claude Code 中运行 `/orchestrator setup` 来探测它们并获得配置建议。
 
 <details>
 <summary><b>更多选项：项目级安装、指定版本、卸载、手动安装</b></summary>
@@ -205,7 +218,8 @@ curl -fsSL https://raw.githubusercontent.com/yoelkh/orkestraku/main/install.sh |
 
 | 示例 | 效果 |
 |---|---|
-| `/orchestrator scan` | 扫描、探测并显示执行者表格，以及启用每个闲置 CLI 的步骤。 |
+| `/orchestrator scan` | 仅阶段 1：扫描、探测并显示执行者表格。 |
+| `/orchestrator setup` | 阶段 1 和 2：执行者表格、能力地图、排序后的配置步骤，并在你登录后重新探测。到此为止。 |
 | `/orchestrator 比较三个最流行的 Rust Web 框架，用于一个小型 API` | 由最合适的就绪执行者并行调研，Claude 汇总并核实事实。 |
 | `/orchestrator 审查 src/auth 的安全问题，并要第二意见` | 跨厂商评审团审查；Claude 核实他们意见不一致的每一点。 |
 | `/orchestrator workers=agy:pro,opencode tier=fast 为 src/utils 添加单元测试` | agy 固定使用 Pro 系列，其余使用更便宜的模型。 |
@@ -219,7 +233,8 @@ curl -fsSL https://raw.githubusercontent.com/yoelkh/orkestraku/main/install.sh |
 
 | | **supervised**（默认，监督） | **auto**（自动） |
 |---|---|---|
-| 启动前 | 展示执行者表格和 `任务 · 执行者 · 模型 · 档位 · 强度 · 权限` 计划并等待你确认 | 立即开始 |
+| 配置顾问（阶段 2） | 询问你要做哪些配置并等待你 | 不提问：使用已就绪的执行者，并在最终报告中列出配置建议 |
+| 启动前 | 展示 `任务 · 执行者 · 模型 · 档位 · 强度 · 权限` 计划并等待你确认 | 立即开始 |
 | 执行者提问时 | 涉及范围或架构 → 问你；纯技术问题 → 自己回答 | 自己回答，选择最可逆的方案并记录 |
 | 升级 | 先询问 | 自动 |
 | 预算 | 无 | 最多 10 次委派（评审团成员也计数），每个任务最多恢复 2 次 |

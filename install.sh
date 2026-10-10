@@ -85,5 +85,5 @@ if [ "$SCAN" -eq 1 ]; then
   echo "  sub            agent      true   Claude subagents (always available)"
 fi
 
-printf '\n  Next: open Claude Code and run /orchestrator scan to see which workers are ready, then /orchestrator <task>\n'
+printf '\n  Next: open Claude Code and run /orchestrator setup to analyze your CLIs and get setup advice, then /orchestrator <task>\n'
 printf '  Sign-in and API keys stay your call; the skill never installs or logs in anything for you.\n\n'

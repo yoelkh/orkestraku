@@ -158,8 +158,8 @@ if (-not $NoScan) {
 
 Write-Host ''
 Write-Host '  Next: open Claude Code and run ' -NoNewline
-Write-Host '/orchestrator scan' -ForegroundColor Cyan -NoNewline
-Write-Host ' to see which workers are ready, then ' -NoNewline
+Write-Host '/orchestrator setup' -ForegroundColor Cyan -NoNewline
+Write-Host ' to analyze your CLIs and get setup advice, then ' -NoNewline
 Write-Host '/orchestrator <task>' -ForegroundColor Cyan
 Write-Host '  Sign-in and API keys stay your call; the skill never installs or logs in anything for you.'
 Write-Host ''

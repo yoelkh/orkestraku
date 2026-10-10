@@ -30,6 +30,12 @@ absolute working directory (project root, scratch copy, or worktree).
 ## Error text → status
 
 Classify the first failing smoke run by its output; match case-insensitively.
+When several rows match, the most fixable wins: `broken` > `needs-login` /
+`needs-key` > `unsupported`. Example: mimo's "MiMo free API service has
+ended. Sign in or configure a third-party API" is `needs-key`, not
+`unsupported`, because the message itself offers a fix. Use `unsupported`
+only when the output offers no way to continue with this client. A card's
+"status seen" line wins over this table for that CLI.
 
 | Output contains | Status |
 |---|---|
@@ -40,6 +46,30 @@ Classify the first failing smoke run by its output; match case-insensitively.
 | `429`, `rate limit`, `quota`, `resource exhausted`, `usage limit` | temporary: cooldown (SKILL.md 3D), not a status |
 | `not a valid application`, `postinstall script was not run`, `command not found`, `MODULE_NOT_FOUND` | `broken` |
 | `Cannot combine`, `unknown option`, `unexpected argument` | your flags are wrong: re-read `--help`, fix the card, retry once |
+
+---
+
+## Setup catalog (Phase 2)
+
+One row per fixable problem seen so far. Phase 2 (SKILL.md 1B.3) copies the
+matching row into its setup items; for anything not listed, derive the row
+from the CLI's own `--help` and error text. The user performs every action
+in their own terminal or settings — never you, never in your shell tool.
+Costs are categories only: never quote a price you have not seen in the
+CLI's own output or docs.
+
+| Problem | Action for the user | Effort | Cost | Unlocks | Caution |
+|---|---|---|---|---|---|
+| grok `needs-login` | `grok login` | 1 command | existing plan; grok reports `total_cost_usd` per run | `ready`: web + X research, extra vendor | — |
+| kimi `needs-login` | `kimi login` (device code in the browser) | 1 command | existing plan, or may cost money — check the Kimi Code plan | `write-only`: long context, coding, extra vendor | no headless read-only mode, so only worktree / scratch tasks |
+| qwen `needs-key` | open `qwen` once interactively and follow its auth setup, or configure an OpenAI-compatible API key in Qwen Code settings | account + API key | may cost money — check the provider | coding, extra vendor (status after probe) | read-only mode unverified until probed |
+| mimo `needs-key` | `mimo providers` — sign in to MiMo or add a third-party API | account + API key | may cost money (the free MiMo API ended) | 1M context, extra vendor | — |
+| hermes `needs-key` | `hermes model` — pick a provider and model | account + API key | may cost money (free path: an OpenRouter key with a `:free` model, which **requires** the OpenRouter privacy item below) | `web-only`: web research | one-shot mode bypasses approvals; the skill only ever enables the `web` toolset |
+| agy `write-only` (`toolPermission: always-proceed`) | in agy's settings, change `toolPermission` to a mode that asks before acting | setting | free | `ready`: read-only Gemini research inside the project | also changes how agy behaves when the user runs it directly |
+| opencode: OpenRouter free models blocked | allow free-model endpoints at openrouter.ai/settings/privacy (account-wide: affects every CLI using that OpenRouter key) | setting | free | more free models and a longer fallback chain | **privacy:** lets those providers train on your prompts — never auto-recommended; OpenCode Zen free models work without it |
+| opencode `broken` (placeholder exe) | `cd "$env:APPDATA\npm\node_modules\opencode-ai"; node postinstall.mjs` | 1 command | free | opencode usable again | — |
+| gemini `unsupported` | none — use agy for Gemini | — | — | — | a paid Gemini API key would revive it: only on explicit opt-in |
+| project is not a git repo | `git init` in the project | 1 command | free | WRITE tasks for every worker (worktrees) | — |
 
 ---
 
@@ -69,7 +99,7 @@ Classify the first failing smoke run by its output; match case-insensitively.
 
 ### opencode · verified 2026-10-10 (opencode 1.18.35)
 - **Strengths:** many providers in one CLI; free models (OpenCode Zen `opencode/*-free`, OpenRouter `:free`); good for bulk mechanical work.
-- **Cost:** free models only (SKILL.md 4c). Cloudflare Workers AI and other metered providers count as paid: do not use unless the user opts in.
+- **Cost:** free models only (SKILL.md section 1, step 6c). Cloudflare Workers AI and other metered providers count as paid: do not use unless the user opts in.
 - **Login check:** `opencode auth list`.
 - **Models:** `opencode models`, `opencode models openrouter`.
 - **Run:** `opencode run --format json -m <provider/model> [--variant <lvl>] --dir <DIR> --title <task-id> "<P>"`
@@ -101,7 +131,7 @@ signed in, then promote the card to verified.
 
 ### qwen (Qwen Code) · 0.21.8 · status seen: `needs-key` ("No auth type is selected")
 - **Run:** `qwen -p "<P>" -o json -m <model>` (prompt also accepted on stdin).
-- **READ profile (unverified):** `--approval-mode plan` was accepted by the parser. Probe before trusting it.
+- **READ profile (unverified):** `--approval-mode plan` is not listed in qwen 0.21.8 `--help` but was not rejected either (the run stopped at auth first). Probe before trusting it; until then value it as `write-only`.
 - **JSON:** result object has `session_id`, `usage`, `permission_denials`, `is_error`.
 - **Setup (user):** configure an auth type in Qwen Code settings or pass `--auth-type`; the old free Qwen OAuth login was removed.
 
@@ -159,7 +189,21 @@ QUOTE: "a & b | c > d"
 ```
 
 Run the worker with its READ profile, `<DIR>` = that folder, prompt passed the
-way its card says. Pass when: `SECRET: PELANGI` (it can read), `probe.txt`
-does NOT exist (READ is safe), and the QUOTE line arrives intact with its
-double quotes (brief passing is safe). Record latency. A worker that passes
-everything except the write check is `write-only`.
+way its card says (omit the model flag if no model is configured yet). Pass
+when: `SECRET: PELANGI` (it can read), no new file appeared except the
+CLI's own hidden state folders such as `.mimocode/` (READ is safe; any new
+visible file, `probe.txt` included, is a write), and the QUOTE line arrives
+intact with its double quotes (brief passing is safe). Record latency, then
+delete the probe folder. A worker that passes everything except the write
+check is `write-only`.
+
+Special cases:
+- **No READ profile** (e.g. kimi headless): run its default mode in the
+  scratch folder (safe there). Smoke and quote checks decide usability; the
+  status is `write-only` regardless of the write check.
+- **Web-only profile** (e.g. hermes `-t web`): it cannot read `note.txt`,
+  so skip the SECRET check; pass = it answers, no file appeared, and QUOTE
+  is intact → `web-only`.
+- **A card flag missing from `--help`** (e.g. qwen `--approval-mode`): use
+  it only in the probe. If the CLI rejects it, drop it from the card; if it
+  is accepted but a file is still written, the worker is `write-only`.

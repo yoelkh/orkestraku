@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Run this session as the BRAIN that discovers every AI agent CLI on the machine (grok, agy/Gemini, opencode, qwen, kimi, hermes, and any other it finds) plus Claude subagents, probes which ones are really usable, and delegates independent work to them — choosing worker, model and effort per task, in supervised or auto-accept mode. No third-party bridge. Use on /orchestrator, "delegasikan", "pakai worker", "scan CLI", or when splitting a task across agents.
+description: Three-phase workflow that turns this session into the BRAIN of an AI orchestra. Phase 1 analyzes every AI agent CLI on the machine (grok, agy/Gemini, opencode, qwen, kimi, hermes, and any other it finds) plus Claude subagents and probes which are really usable. Phase 2 recommends the logins and setup steps that would add the most capability and waits for the user. Phase 3 delegates independent work to the ready workers — choosing worker, model and effort per task, in supervised or auto-accept mode. No third-party bridge. Use on /orchestrator, "delegasikan", "pakai worker", "scan CLI", "setup worker", or when splitting a task across agents.
 allowed-tools: Agent Read Grep Glob
 ---
 
@@ -13,6 +13,20 @@ wrapper package. The brain is this interactive session only — never run
 
 Goal: use **every worker that is actually usable** on this machine, each for
 what it is best at — not only the ones you already know.
+
+## Workflow: three phases, in this order
+1. **Phase 1 — Analyze** (section 1): find every AI CLI, probe it, build the
+   worker table and the model catalog.
+2. **Phase 2 — Setup advisor** (section 1B): map which capabilities are
+   covered, recommend the logins and setup steps that would add the most,
+   let the user do them, and re-probe what they set up.
+3. **Phase 3 — Brain** (sections 2–10): plan, delegate, supervise, verify.
+
+**Gate:** never launch a worker for the task (Phase 3) before Phase 2 has
+ended — either the user finished the setup they chose and you re-probed it,
+or the user chose to continue with the workers already ready, or Phase 2 was
+skipped by the rules in 1B.1. Analysis and setup advice come first; the
+brain works only with workers whose status is known.
 
 Supporting files (relative to this skill's folder):
 - `scripts/discover.ps1` / `scripts/discover.sh` — finds every AI CLI, prints JSON.
@@ -48,9 +62,12 @@ Syntax:
   are opt-in downgrades or pins the user sets.
 - `effort=` global default reasoning effort. Default `auto` (section 3).
 - `mode=` defaults to `supervised`.
-- `rescan` ignores the cache and probes every CLI again (section 1, step 4).
-- Anything else is the task. `/orchestrator scan` (no task) runs preflight
-  only and shows the worker table.
+- `rescan` ignores the cache and probes every CLI again (section 1, step 4),
+  then runs Phase 2 in full.
+- Anything else is the task.
+- Without a task: `/orchestrator scan` runs Phase 1 and shows the worker
+  table; `/orchestrator setup` runs Phase 1 and a full Phase 2 (even for
+  items the user declined before), then stops.
 
 Echo the resolved setup in one line before working, e.g.
 `Roster: grok→grok-4.7, agy→gemini-3.8-flash-high, opencode→opencode/nemotron-3-ultra-free, sub→fable · Idle: qwen (needs-key), kimi (needs-login) · Tier: best · Effort: auto · Mode: supervised · Brain: <session model> · Shell: PowerShell`.
@@ -60,7 +77,7 @@ in plain language ("T2 pakai agy pro", "semua pakai fast", "naikkan effort",
 "mode auto", "jangan pakai hermes"). Apply it from the next launch and echo
 the new setup.
 
-## 1. Preflight (once per session)
+## 1. Phase 1 — Analyze (preflight, once per session)
 1. **Brain check.** Note your own session model. If it is not an Opus- or
    Fable-class model, warn once that brain decisions will be weaker and
    suggest `/model opus` (or `/model fable`, which has a limited quota). You
@@ -77,28 +94,42 @@ the new setup.
    `references/workers.md`.
    - `brain` (claude) and `gateway` (openclaw) → status `excluded`.
    - `runs: false` → status `broken`; give the fix from the card if any.
-   - `candidate` → read its `--help`; if it is not an agent or LLM CLI (e.g.
-     a package manager), drop it silently; otherwise onboard it
-     (`references/workers.md`, "Onboarding an unknown CLI").
+   - `candidate` → read its `--help` once per package (several bins of one
+     package share one check); if it is not an agent or LLM CLI (e.g. a
+     package manager), cache it as `excluded` with note `not an agent` so it
+     is not re-read until its version changes, and do not show it; otherwise
+     onboard it (`references/workers.md`, "Onboarding an unknown CLI").
 4. **Cache.** Read `~/.claude/orchestra/workers-cache.md` (create it if
-   missing): one row per CLI,
-   `worker | version | status | read-profile | strengths | best model | latency | probed | note`.
-   - Reuse a `ready` / `write-only` / `web-only` / `excluded` row when the
-     version is unchanged and `probed` is under 7 days old.
-   - Re-probe every row with any other status at every preflight (auth
-     failures return in seconds, so a CLI the user just signed in to is
-     picked up right away), every row whose version changed, and every row
-     when the user says `rescan`.
+   missing) as UTF-8, and write it back as UTF-8 using plain ASCII
+   characters only (in PowerShell 5.1 always pass `-Encoding utf8`; its
+   default is ANSI). One row per CLI,
+   `worker | version | status | read-profile | strengths | best model | latency | probed | setup | note`.
+   `setup` records Phase 2 decisions: empty, `declined <date>`, or
+   `pending <date>` (the user said they would do it later).
+   - Reuse a `ready` / `write-only` / `web-only` row when the version is
+     unchanged and `probed` is under 7 days old.
+   - Reuse an `excluded` / `unsupported` / `no-headless` row while the
+     version is unchanged (probing again cannot change the answer).
+   - Re-probe `needs-login` / `needs-key` / `broken` rows at every preflight
+     (they fail in seconds, so a CLI the user just signed in to is picked up
+     right away), every row whose version changed, and every row when the
+     user says `rescan`.
 5. **Probe.** For each CLI that needs it, read its card in
    `references/workers.md`, confirm the card's flags against `--help` (adapt
    and note any rename; never guess a flag or an effort level), then run
    **the probe** from that file in a scratch folder outside the project
-   (your scratchpad, or the system temp folder). Run independent probes in
-   parallel. Classify failures with the card file's error → status table.
-   Also apply each card's permission audit (for agy: read
-   `~/.gemini/antigravity-cli/settings.json` `toolPermission`). Write the
-   results back to the cache.
-6. **Model catalog — rebuilt every session, never from memory.** For each
+   (your scratchpad, or the system temp folder). If the card's run line has a
+   model flag but no model is known yet, omit it so the CLI uses its own
+   default. Run independent probes in parallel. Classify failures with the
+   card file's error → status table (its precedence rule decides when
+   several rows match). Delete each probe folder after recording the result.
+   Write the results back to the cache.
+   **Permission audits run every preflight, cached or not** (they are a
+   single settings read): for agy, read only the `toolPermission` value in
+   `~/.gemini/antigravity-cli/settings.json`; if it changed, update the
+   row's status (`always-proceed` → `write-only`, otherwise re-probe).
+6. **Model catalog — rebuilt every session, never from memory.** Only when
+   a task will run (skip on `scan` / `setup` without a task). For each
    usable worker, list models only from its live source (the card's
    "Models" line; for OpenRouter free models also read
    `https://openrouter.ai/api/v1/models`, no key needed). Write
@@ -147,21 +178,153 @@ the new setup.
      decision) and fall back to OpenCode Zen free models.
    - Never set up a key yourself.
 
-7. **Show the worker table** (always in supervised mode, and on
-   `/orchestrator scan`):
-   `worker | version | status | profile limits | strengths | best model | latency`
-   followed by one line per idle worker with the exact action that would
-   enable it ("kimi: run `kimi login`", "qwen: configure an auth type").
+7. **Phase 1 report — the worker table** (always in supervised mode, on
+   `scan` and `setup`):
+   `worker | version | status | profile limits | strengths | best model | latency | note`
+   One row per usable or idle CLI plus `sub`; `note` holds the reason for a
+   limit or an idle status (e.g. `toolPermission=always-proceed`).
+   `unsupported` and `excluded` CLIs are not table rows: list them in one
+   line each under the table (`Unsupported: gemini (free plan ended — use
+   agy)`, `Excluded: claude (brain), openclaw (gateway)`). Dropped non-agent
+   candidates are not shown. Phase 2 turns idle rows into recommendations.
 8. **Subagent override check.** If `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is set,
    every `sub` worker runs on that one model — say so.
 9. Never install, update, or log in anything yourself, in any mode — tell
    the user. If no external CLI is usable, continue with `sub` only (normal
    in Cowork and cloud sessions).
-10. Create `.orchestra/` with `briefs/`, `runs/`, `models.md`, and
+10. Only when a task will run: create `.orchestra/` with `briefs/`, `runs/`, `models.md`, and
     `orchestra-log.md`. Add `.orchestra/` to `.gitignore` if the project uses
     git. If the project is NOT a git repo, WRITE profiles are unavailable (no
     worktrees): in supervised mode suggest `git init`; until then keep all
     file-changing work for yourself or `sub`.
+
+## 1B. Phase 2 — Setup advisor
+Turn the analysis into concrete advice, let the user act on it, and confirm
+the result before the brain starts working.
+
+### 1B.1 When it runs
+- **Full** (steps 1B.2–1B.6) when any of these is true: there was no cache
+  before this session (first run on this machine); the user ran `setup` or
+  `rescan`; Phase 1 found a CLI that is new, changed version, or changed
+  status; or a capability gap (1B.2) could be filled by an item the user has
+  not declined in the last 30 days.
+- **Short** otherwise: one line before the setup line, e.g.
+  `Idle: kimi (needs-login), qwen (needs-key) — /orchestrator setup to enable`,
+  then go straight to Phase 3.
+- **mode=auto:** never pause here. Skip the questions, continue with the
+  ready workers, and put the full recommendation list in the final report.
+- Nothing to recommend (every CLI is ready, excluded, or unsupported with
+  no alternative) → say so in one line and go on.
+
+### 1B.2 Capability map
+Check which roles have at least one usable worker:
+
+| Role | Covered by a worker that is |
+|---|---|
+| Web / X research | `ready` or `web-only`, with web search in its strengths |
+| Long context (≥1M) | `ready` or `write-only`, long context in its strengths |
+| Cheap or free bulk edits | `ready` or `write-only`, free models or flat plan |
+| Read-only research inside the project | `ready` (a `write-only` worker does not count) |
+| Cross-vendor second opinion | at least 2 `ready` workers from different vendor families, besides `sub` |
+
+`sub` always covers strongest reasoning. A role with no worker is a **gap**.
+A worker's **vendor family** is the family of the model it actually runs:
+its selected best model, or for a CLI that serves many vendors (opencode,
+hermes, mimo, agy) the vendor of that model (e.g. opencode on
+`opencode/nemotron-3-ultra-free` = NVIDIA).
+
+### 1B.3 Setup items
+Build one item for every fixable problem Phase 1 found:
+- each CLI with status `needs-login`, `needs-key`, or `broken`;
+- each `write-only` worker whose READ profile could be fixed by a user
+  setting (e.g. agy `toolPermission`);
+- provider blocks inside a ready CLI (e.g. OpenRouter free models blocked by
+  privacy settings);
+- no git repo while the current task needs file changes (`git init`); skip
+  this item when there is no task.
+
+Each item, using the card's **Setup** block in `references/workers.md` (or
+`--help` for a CLI without a card):
+`# | action (exact command or setting) | who/where | effort | cost | requires | unlocks | caution`
+- **who/where:** the user always does it. Login flows open a browser or
+  show a device code: they run in the user's own terminal, never in your
+  shell tool, and never with credentials typed into this chat.
+- **effort:** `1 command` · `setting` · `account + API key`.
+- **cost:** `free` · `existing plan` · `may cost money — check the
+  provider's pricing`. Never claim a price you have not seen in the CLI's own
+  output or docs. If the catalog gives two buckets or a conditional cost
+  ("existing plan, or may cost money", "free only with …"), use the more
+  expensive one unless the user has told you their plan covers it, and put
+  the cheaper path in `caution`.
+- **requires:** another item that must be done first (e.g. hermes on a free
+  model requires the OpenRouter privacy item). Choosing an item includes its
+  prerequisites; say so.
+- **unlocks:** the gap it fills or the role it strengthens, plus status after
+  setup (`ready`, `write-only`, `web-only`).
+- **caution:** privacy trade-offs (e.g. allowing a provider to train on
+  prompts), auto-approve behaviour, anything that leaves the machine.
+
+`unsupported` CLIs get no item; mention them once with the alternative
+(e.g. "gemini CLI: free plan ended — Gemini is already available through
+agy"). `excluded` CLIs are not mentioned unless the user asks.
+
+### 1B.4 Rank and present
+Give each item a **value** from its status *after* setup. When that status
+is not known yet (the card says "unverified" or "status after probe"),
+assume `write-only` — value it conservatively and say so:
+- **3 — fills a gap** from 1B.2.
+- **2 — new READ-capable vendor:** the result is `ready` and its vendor
+  family is not yet among the ready workers (it can join read-only panels).
+- **1 — improves:** a `write-only` or `web-only` result, a vendor already
+  covered, or more models for an existing worker.
+- **0 — redundant:** nothing new; list it but never recommend it.
+
+Order items by: value-3 items first (any cost); then all others by cost
+(free > existing plan > may cost money), then value (high first), then
+effort (`1 command` > `setting` > `account + API key`), then name. This way
+a free fix is never buried under a paid one.
+
+Show:
+1. The capability map (covered roles and gaps), in one short table.
+2. The ranked items table, numbered in that order.
+3. A recommendation in one or two sentences. **Recommend** the items with
+   value ≥ 1 that cost nothing extra (free or existing plan) **and** have no
+   privacy caution; present privacy trade-offs neutrally as the user's call;
+   mention paid items as optional with what they would add; never
+   recommend value 0.
+
+Then ask with AskUserQuestion (multiSelect): the first 3 items of the ranked
+list as options (so the options always match your ranking; add
+"(Recommended)" only to recommended items), plus "Continue with the ready
+workers". If there are more than 3 items, end the question text with
+"More: #4–#n in the table — type their numbers under Other."
+
+### 1B.5 Guide, wait, re-probe
+- For each chosen item, give the steps: the exact command in its own fenced
+  block, what the user will see (browser, device code, a menu), and how to
+  tell you they are done ("sudah" / "done").
+- Wait for the user. Do not poll, and do not start Phase 3 while setup is
+  in progress.
+- When the user says it is done: re-run the probe (section 1, step 5) only
+  for the affected CLIs, update the cache, build their model catalog when a
+  task will run (section 1, step 6), and report each result in one line (e.g.
+  `kimi: needs-login → write-only (no read-only mode headless)`). Still
+  failing → show the new error and the next step; offer to retry once more
+  or move on.
+- Repeat until every chosen item is done, or the user says to continue.
+
+### 1B.6 Record and hand over
+- Record each offered item's outcome in the `setup` field of the CLI row it
+  belongs to (the agy row for the agy setting, the opencode row for the
+  OpenRouter privacy item): `declined <date>` for items not chosen —
+  including every item when the user picks "Continue with the ready
+  workers" — or `pending <date>` when they said "later". A row with two
+  items gets both, separated by `;`. Project-level items (`git init`) are
+  not recorded. Do not re-recommend a declined item for 30 days unless the
+  user runs `setup`.
+- Echo the final setup line (section 0) with the updated roster and the
+  remaining idle workers. With a task → start Phase 3. Without a task
+  (`setup`, `scan`) → stop here.
 
 ## 2. When to delegate (all three must be true, otherwise do it yourself)
 1. The task is independent: it does not need files another worker is editing.
@@ -344,9 +507,10 @@ when each process ends.
 ## 8. Modes
 
 ### supervised (default)
-- Show the worker table (section 1, step 7) and the plan before the first
-  launch: `task | worker | model | tier | effort | profile`. Proceed when the
-  user agrees; apply any changes they ask for.
+- Run Phases 1 and 2 as described (Phase 2 full or short per 1B.1). Then,
+  before the first launch, show the plan:
+  `task | worker | model | tier | effort | profile`. Proceed when the user
+  agrees; apply any changes they ask for.
 - Worker questions that change scope, requirements, or architecture → ask the
   user. Purely technical questions → answer yourself.
 - Ask before escalating a task (higher tier or highest effort).
@@ -354,7 +518,8 @@ when each process ends.
 ### auto (auto-accept)
 You act as orchestrator AND supervisor; the user is not consulted mid-run.
 - Do not ask the user anything and do not pause between phases. Do not use
-  AskUserQuestion.
+  AskUserQuestion. Phase 2 runs without questions (1B.1): continue with the
+  ready workers and list the setup recommendations in the final report.
 - Answer every BLOCKED / NEED_DECISION yourself. Choose the option that is
   most reversible and closest to the original task. Record each decision.
 - Escalate and fall back per 3D without asking.
@@ -373,7 +538,8 @@ You act as orchestrator AND supervisor; the user is not consulted mid-run.
   - anything you cannot undo with git
 - End with one report: what was done, by which worker and model (requested vs
   actual), what you verified, every auto-decision, escalation, and cooldown
-  with its reason, anything skipped by a hard stop, and FAILED items.
+  with its reason, anything skipped by a hard stop, FAILED items, and the
+  Phase 2 setup recommendations that would have added capability.
 
 Auto mode only removes the BRAIN's questions to the user. Claude Code's own
 permission prompts (including the prompt before each worker command) are

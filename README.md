@@ -42,6 +42,7 @@ The workers are **whatever AI command-line tools you have installed**. OrkestraK
 | 🔎 | **Finds every AI CLI you have** | A read-only scanner checks your PATH for 43 known AI CLIs and your global npm packages for unknown ones. It only runs version commands. |
 | 🧪 | **Test-drives before trusting** | Each CLI gets a three-in-one probe in a scratch folder: can it read a file, does its read-only mode really block writes, do quotes survive the trip. |
 | 🏷️ | **Knows why a CLI is idle** | Every failure is classified (`needs-login`, `needs-key`, `unsupported`, `broken`, …) with the exact step that would enable it. |
+| 🧭 | **Setup advisor before work starts** | Maps which roles are covered (web, long context, free edits, cross-vendor review), ranks the logins and settings that would add the most — free before paid, privacy trade-offs never pushed — waits while you do them, then re-probes. |
 | 🗂️ | **Remembers across projects** | Probe results are cached per CLI version, so slow or paid probes are not repeated. Idle CLIs are re-checked every session, so signing in is picked up at once. |
 | 🧠 | **Claude stays the brain** | Plans, decides, supervises and verifies. Nothing is accepted on a worker's word alone. |
 | 🎯 | **Uses the whole roster** | Routes by capability (web search, long context, free models, strongest reasoning), spreads parallel tasks across workers, and can ask a cross-vendor panel for second opinions. |
@@ -56,12 +57,24 @@ The workers are **whatever AI command-line tools you have installed**. OrkestraK
 
 ## 🧭 How it works
 
+Every run goes through three phases, in order. The brain never starts working before it knows exactly which workers it has.
+
 ```mermaid
 flowchart TD
-    U(["You: /orchestrator task"]) --> SC["Scan<br/>every AI CLI on PATH + npm"]
-    SC --> PR["Probe<br/>read · write-block · quotes"]
-    PR --> CAT["Model catalog<br/>newest model per worker"]
-    CAT --> PL["Plan<br/>split into tasks"]
+    U(["You: /orchestrator task"]) --> P1
+    subgraph P1["Phase 1 · Analyze"]
+        SC["Scan<br/>every AI CLI on PATH + npm"] --> PR["Probe<br/>read · write-block · quotes"]
+    end
+    P1 --> P2
+    subgraph P2["Phase 2 · Setup advisor"]
+        MAP["Capability map<br/>which roles are covered?"] --> REC["Ranked recommendations<br/>login · key · setting"]
+        REC --> ASK{"You pick<br/>what to set up"}
+        ASK -- "set up" --> DO["You sign in<br/>in your own terminal"] --> RE["Re-probe"] --> ASK
+    end
+    ASK -- "continue" --> P3
+    subgraph P3["Phase 3 · Brain"]
+        CAT["Model catalog<br/>newest model per worker"] --> PL["Plan<br/>split into tasks"]
+    end
     PL --> D{"Worth<br/>delegating?"}
     D -- "no: small or coupled" --> SELF["Claude does it"]
     D -- yes --> B["Write brief<br/>.orchestra/briefs/T1.md"]
@@ -176,7 +189,7 @@ The installer copies the skill to `~/.claude/skills/orchestrator/`, backs up any
   [OK] sub          agent     Claude subagents (always available)
 ```
 
-"Found" is not the same as "ready": run `/orchestrator scan` in Claude Code to probe them.
+"Found" is not the same as "ready": run `/orchestrator setup` in Claude Code to probe them and get setup advice.
 
 <details>
 <summary><b>More options: project scope, a specific version, uninstall, manual install</b></summary>
@@ -205,7 +218,8 @@ In Claude Code:
 
 | Example | What happens |
 |---|---|
-| `/orchestrator scan` | Scans, probes and shows the worker table, with the step that would enable each idle CLI. |
+| `/orchestrator scan` | Phase 1 only: scans, probes and shows the worker table. |
+| `/orchestrator setup` | Phases 1 and 2: the worker table, the capability map, ranked setup steps, and a re-probe after you sign in. Stops there. |
 | `/orchestrator compare the 3 most popular Rust web frameworks for a small API` | Parallel research by the best-fit ready workers, synthesised and fact-checked by Claude. |
 | `/orchestrator review src/auth for security issues, get a second opinion` | A cross-vendor panel reviews; Claude checks every point they disagree on. |
 | `/orchestrator workers=agy:pro,opencode tier=fast add unit tests for src/utils` | agy pinned to its Pro family, cheaper models elsewhere. |
@@ -219,7 +233,8 @@ You can steer it mid-session in plain language, in any language: *"T2 use agy pr
 
 | | **supervised** (default) | **auto** |
 |---|---|---|
-| Before launching | Shows the worker table and a `task · worker · model · tier · effort · profile` plan, then waits for you | Starts immediately |
+| Setup advisor (Phase 2) | Asks which setup steps you want and waits for you | No questions: works with the ready workers and lists the setup steps in the final report |
+| Before launching | Shows a `task · worker · model · tier · effort · profile` plan, then waits for you | Starts immediately |
 | Worker asks a question | Scope or architecture → asks you. Technical → answers itself | Answers itself, picking the most reversible option, and logs it |
 | Escalation | Asks first | Automatic |
 | Budget | none | max 10 delegations (panel members count), 2 resumes each |

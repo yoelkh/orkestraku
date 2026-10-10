@@ -42,6 +42,7 @@ Los workers son **las herramientas de IA de línea de comandos que tengas instal
 | 🔎 | **Encuentra cada CLI de IA que tienes** | Un escáner de solo lectura busca en tu PATH 43 CLIs de IA conocidas y, en tus paquetes globales de npm, otras desconocidas. Solo ejecuta comandos de versión. |
 | 🧪 | **Prueba antes de confiar** | Cada CLI pasa una prueba "tres en uno" en una carpeta temporal: ¿puede leer un archivo?, ¿su modo de solo lectura bloquea de verdad la escritura?, ¿llegan intactas las comillas? |
 | 🏷️ | **Sabe por qué una CLI está inactiva** | Cada fallo se clasifica (`needs-login`, `needs-key`, `unsupported`, `broken`…) junto con el paso exacto para activarla. |
+| 🧭 | **Asesor de configuración antes de trabajar** | Muestra qué roles están cubiertos (web, contexto largo, ediciones gratuitas, revisión entre proveedores), ordena los inicios de sesión y ajustes que más aportarían —lo gratuito antes que lo de pago, y nunca empuja concesiones de privacidad—, espera mientras los haces y vuelve a probar. |
 | 🗂️ | **Recuerda entre proyectos** | Los resultados se guardan por versión de cada CLI, así que las pruebas lentas o de pago no se repiten. Las CLIs inactivas se revisan en cada sesión: en cuanto inicias sesión, se usan. |
 | 🧠 | **Claude sigue siendo el cerebro** | Planifica, decide, supervisa y verifica. Nada se acepta solo por la palabra de un worker. |
 | 🎯 | **Aprovecha toda la orquesta** | Asigna por capacidad (búsqueda web, contexto largo, modelos gratuitos, razonamiento más fuerte), reparte las tareas paralelas entre workers y puede pedir a un panel de varios proveedores una segunda opinión. |
@@ -56,12 +57,24 @@ Los workers son **las herramientas de IA de línea de comandos que tengas instal
 
 ## 🧭 Cómo funciona
 
+Cada ejecución pasa por tres fases, en orden. El cerebro nunca empieza a trabajar antes de saber exactamente con qué workers cuenta.
+
 ```mermaid
 flowchart TD
-    U(["Tú: /orchestrator tarea"]) --> SC["Escanear<br/>cada CLI de IA en PATH y npm"]
-    SC --> PR["Probar<br/>lectura · bloqueo de escritura · comillas"]
-    PR --> CAT["Catálogo de modelos<br/>el más nuevo por worker"]
-    CAT --> PL["Plan<br/>dividir en tareas"]
+    U(["Tú: /orchestrator tarea"]) --> P1
+    subgraph P1["Fase 1 · Analizar"]
+        SC["Escanear<br/>cada CLI de IA en PATH y npm"] --> PR["Probar<br/>lectura · bloqueo de escritura · comillas"]
+    end
+    P1 --> P2
+    subgraph P2["Fase 2 · Asesor de configuración"]
+        MAP["Mapa de capacidades<br/>¿qué roles están cubiertos?"] --> REC["Recomendaciones ordenadas<br/>login · clave · ajuste"]
+        REC --> ASK{"Eliges qué<br/>configurar"}
+        ASK -- "configurar" --> DO["Inicias sesión<br/>en tu propia terminal"] --> RE["Volver a probar"] --> ASK
+    end
+    ASK -- "continuar" --> P3
+    subgraph P3["Fase 3 · Cerebro"]
+        CAT["Catálogo de modelos<br/>el más nuevo por worker"] --> PL["Plan<br/>dividir en tareas"]
+    end
     PL --> D{"¿Vale la pena<br/>delegar?"}
     D -- "no: pequeña o acoplada" --> SELF["La hace Claude"]
     D -- sí --> B["Escribir brief<br/>.orchestra/briefs/T1.md"]
@@ -176,7 +189,7 @@ El instalador copia la skill a `~/.claude/skills/orchestrator/`, guarda en `~/.c
   [OK] sub          agent     Claude subagents (always available)
 ```
 
-"Encontrada" no es lo mismo que "lista": ejecuta `/orchestrator scan` en Claude Code para probarlas.
+"Encontrada" no es lo mismo que "lista": ejecuta `/orchestrator setup` en Claude Code para probarlas y recibir recomendaciones de configuración.
 
 <details>
 <summary><b>Más opciones: por proyecto, versión concreta, desinstalar, instalación manual</b></summary>
@@ -205,7 +218,8 @@ En Claude Code:
 
 | Ejemplo | Qué ocurre |
 |---|---|
-| `/orchestrator scan` | Escanea, prueba y muestra la tabla de workers, con el paso que activaría cada CLI inactiva. |
+| `/orchestrator scan` | Solo la fase 1: escanea, prueba y muestra la tabla de workers. |
+| `/orchestrator setup` | Fases 1 y 2: la tabla de workers, el mapa de capacidades, los pasos de configuración ordenados y una nueva prueba tras iniciar sesión. Se detiene ahí. |
 | `/orchestrator compara los 3 frameworks web de Rust más populares para una API pequeña` | Investigación en paralelo por los workers listos más adecuados; Claude sintetiza y verifica los datos. |
 | `/orchestrator revisa src/auth en busca de fallos de seguridad, con segunda opinión` | Un panel de varios proveedores revisa; Claude comprueba cada punto en el que discrepen. |
 | `/orchestrator workers=agy:pro,opencode tier=fast añade tests unitarios a src/utils` | agy fijado a su familia Pro; modelos más baratos en el resto. |
@@ -219,7 +233,8 @@ Puedes ajustarlo a mitad de sesión con lenguaje natural, en cualquier idioma: *
 
 | | **supervised** (por defecto) | **auto** |
 |---|---|---|
-| Antes de lanzar | Muestra la tabla de workers y un plan `tarea · worker · modelo · nivel · esfuerzo · perfil`, y espera tu visto bueno | Empieza de inmediato |
+| Asesor de configuración (fase 2) | Pregunta qué pasos quieres hacer y te espera | Sin preguntas: trabaja con los workers listos y enumera los pasos en el informe final |
+| Antes de lanzar | Muestra un plan `tarea · worker · modelo · nivel · esfuerzo · perfil` y espera tu visto bueno | Empieza de inmediato |
 | Si un worker pregunta | Alcance o arquitectura → te pregunta. Técnico → responde él | Responde él, elige la opción más reversible y lo registra |
 | Escalado | Pregunta antes | Automático |
 | Presupuesto | ninguno | máx. 10 delegaciones (los miembros del panel cuentan), 2 reanudaciones cada una |
